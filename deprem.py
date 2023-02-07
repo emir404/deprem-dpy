@@ -13,7 +13,7 @@ intents.members = True
 description = 'Deprem Güncelleme Botu'
 
 bot = commands.Bot(command_prefix='!', description=description, intents=intents)
-lastData = None
+lastData = ""
 
 @bot.event
 async def on_ready():
