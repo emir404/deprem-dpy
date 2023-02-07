@@ -13,12 +13,13 @@ intents.members = True
 description = 'Deprem Güncelleme Botu'
 
 bot = commands.Bot(command_prefix='!', description=description, intents=intents)
-lastData = ""
+lastData = None
 
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} adlı bota giriş sağlandı.')
     channel = bot.get_channel(1072336930571825163)
+    lastData = ""
     await channel.send(content="Veriler yükleniyor.")
     while True:
         time.sleep(15)
