@@ -10,30 +10,126 @@ import time
 intents = discord.Intents.default()
 intents.members = True
 
-description = 'Deprem Güncelleme Botu'
+bot = commands.Bot(command_prefix='!', description="Deprem Bilgilendirme", intents=intents)
 
-bot = commands.Bot(command_prefix='!', description=description, intents=intents)
-lastData = None
+global status
+global settings
+
+with open('settings.json') as f:
+    settings = json.load(f)
 
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} adlı bota giriş sağlandı.')
-    channel = bot.get_channel(1072336930571825163)
+    #await send_messages(bot)
+
+async def send_messages(channel):
     lastData = ""
     await channel.send(content="Veriler yükleniyor.")
-    while True:
+    while status:
         time.sleep(15)
         data = get_kandilli_data()
-        if lastData != data["timestamp"]:
-          lastData = data["timestamp"]
-          print(data["location"], data["date"], data["size"]["ml"])
-          embedVar = discord.Embed(title="‼️‼️‼️‼️", color=0x00ff00)
-          embedVar.set_author(name='Deprem Bilgilendirme - Kandilli Rasathanesi - @wearus')
-          embedVar.add_field(name="🌐 Deprem Bölgesi", value=data["location"], inline=False)
-          embedVar.add_field(name="🧱 Derinlik", value="{} km".format(data["depth"]), inline=False)
-          embedVar.add_field(name="🪨 Büyüklük", value="{} ML".format(data["size"]["ml"]), inline=False)
-          embedVar.add_field(name="⏱️ Zaman", value="<t:{}:R> - {}".format(data["timestamp"], data["date"]), inline=False)
-          await channel.send(content="{}".format(data["size"]["ml"] > 5 and "@everyone" or ""), embed=embedVar)
+        if lastData != data["date"]:
+            lastData = data["date"]
+        
+            embedVar = discord.Embed(title="‼️‼️‼️‼️", color=0x00ff00)
+            embedVar.set_author(name='Deprem Bilgilendirme - Kandilli Rasathanesi - @wearus')
+            embedVar.add_field(name="🌐 Deprem Bölgesi", value=data["location"], inline=False)
+            embedVar.add_field(name="🧱 Derinlik", value="{} km".format(data["depth"]), inline=False)
+            embedVar.add_field(name="🪨 Büyüklük", value="{} ML".format(data["size"]["ml"]), inline=False)
+            embedVar.add_field(name="⏱️ Zaman", value="<t:{}:R> - {}".format(data["timestamp"], data["date"]), inline=False)
+            
+            mention = settings["everyone"] and "@everyone" or settings["here"] and "@here"
+            await channel.send(content="{}".format((data["size"]["ml"] > settings["size"]) and mention or ""), embed=embedVar)
+        pass
+
+
+@bot.command(name="başlat")
+@commands.has_permissions(administrator=True)
+async def start(ctx, channel: discord.TextChannel):
+    try: 
+        if channel:
+            global status
+            status = True
+            await ctx.reply(content="Belirtilen kanalda bilgilendirme başlatıldı, durdurmak için !durdur <kanal>")
+            await send_messages(channel)
+        else:
+            await ctx.reply(content="Belirtilen kanal bulunamadı.")
+    except: pass
+
+@bot.command(name="durdur")
+@commands.has_permissions(administrator=True)
+async def stop  (ctx, channel: discord.TextChannel):
+    try: 
+        if channel:
+            global status
+            status = False
+            await ctx.reply(content="Belirtilen kanalda bilgilendirme durduruldu, başlatmak için !baslat <kanal>" )
+        else:
+            await ctx.reply(content="Belirtilen kanalda bilgilendirme bulunamadı.")
+    except: pass
+
+@bot.group(name='ayarlar', invoke_without_command=True)
+@commands.has_permissions(administrator=True)
+async def ayarlar(ctx):
+    embed = discord.Embed()
+    embed.set_author(name="Ayarlar")
+    embed.add_field(name="everyone", value="<aç / kapat>", inline=False)
+    embed.add_field(name="here", value="<aç / kapat>", inline=False)
+    embed.add_field(name="büyüklük", value="<sayı>", inline=False)
+    embed.set_footer(text="!ayarlar <ayar> <durum>")
+    await ctx.reply(embed=embed)
+
+@ayarlar.command()
+@commands.has_permissions(administrator=True)
+async def everyone(ctx, stat):
+    try:
+        if stat:
+            everyoneStatus = stat.lower() == "aç" and True or False
+            if settings["everyone"] != everyoneStatus:
+                settings["everyone"] = everyoneStatus
+                await ctx.reply(content="Everyone ayarı {}.".format(everyoneStatus and "açıldı" or "kapatıldı"))
+            else:
+                await ctx.reply(content="Everyone ayarı aynı, farklı bir değer girmelisin.")
+
+        else:
+            await ctx.reply(content="Bir durum belirtmen gerekiyor, <aç/kapat>")
+    except: pass
+
+@ayarlar.command()
+@commands.has_permissions(administrator=True)
+async def here(ctx, stat):
+    try:
+        if stat:
+            hereStatus = stat.lower() == "aç" and True or False
+            if settings["everyone"] != hereStatus:
+                settings["here"] = hereStatus
+                await ctx.reply(content="Here ayarı {}.".format(hereStatus and "açıldı" or "kapatıldı"))
+            else:
+                await ctx.reply(content="Here ayarı aynı, farklı bir değer girmelisin.")
+        else:
+            await ctx.reply(content="Bir durum belirtmen gerekiyor, <aç/kapat>")
+    except: pass
+
+@ayarlar.command(name="büyüklük")
+@commands.has_permissions(administrator=True)
+async def size(ctx, stat: int):
+    try:
+        if stat:
+            settings["size"] = stat
+            await ctx.reply(content=f"Büyüklük ayarı {stat} olarak değiştirildi.")
+        else:
+            await ctx.reply(content="Bir durum belirtmen gerekiyor, <sayı>")
+    except: pass
+
+@ayarlar.command(name="kaydet")
+@commands.has_permissions(administrator=True)
+async def save(ctx):
+    try:
+        await ctx.reply(content="``settings.json`` başarıyla kaydedildi.")
+        with open('settings.json', 'w') as f:
+            json.dump(settings, f)
+    except: pass
 
 def get_kandilli_data():
     array = []
@@ -73,4 +169,4 @@ def get_kandilli_data():
         array.append(json.loads(json_data))
     return array[0]
 
-bot.run('')
+bot.run('MTA3MjMzMjcxMTYzMDQ3NTI3NA.G10W9b.xO1l_DZbTyeQJsZOuYIQTqtBwS2uJTx2cclbro')
