@@ -169,4 +169,4 @@ def get_kandilli_data():
         array.append(json.loads(json_data))
     return array[0]
 
-bot.run('MTA3MjMzMjcxMTYzMDQ3NTI3NA.G10W9b.xO1l_DZbTyeQJsZOuYIQTqtBwS2uJTx2cclbro')
+bot.run('')
